@@ -42,19 +42,7 @@ Yes, by a wide margin.
 
 ## How it was built
 
-```mermaid
-flowchart LR
-    A["🗂️ Boston Open Data<br/><sub>Food Establishment<br/>Inspections, PDDL</sub>"] --> B["🧹 One row per<br/>routine inspection<br/><sub>17 inputs, no owner names</sub>"]
-    B --> C["📊 Tabular models<br/><sub>2 rules · logistic regression<br/>LightGBM · 4 more</sub>"]
-    B --> D["💬 Inspector comments<br/><sub>MiniLM encoder,<br/>frozen and fine-tuned</sub>"]
-    C --> E["🔒 Config frozen<br/><sub>before the test years</sub>"]
-    D --> E
-    E --> F["📈 Evaluation<br/><sub>train 2016-22 · tune 2023<br/>test 2024 to Nov 2026</sub>"]
-
-    style A fill:#1E293B,stroke:#38BDF8,color:#F8FAFC
-    style E fill:#7C2D12,stroke:#F97316,color:#F8FAFC
-    style F fill:#065F46,stroke:#10B981,color:#F8FAFC
-```
+<p align="center"><img src="assets/method.svg" alt="Method: Boston open data to one row per routine inspection with 17 inputs; tabular models and a MiniLM text branch; settings frozen before the test years; evaluation on 2024 to November 2026." width="100%"></p>
 
 **The settings were frozen before the test years were ever scored.** Train on 2016–2022, tune on 2023, and only then look at 2024 through November 2026. Anything added after that first scoring is marked as such in the results — because a number you tuned against is not a result.
 
