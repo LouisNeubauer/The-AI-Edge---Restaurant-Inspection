@@ -1,0 +1,78 @@
+name: Changelog
+
+# Every merged pull request records itself, so the project's history is
+# readable without running `git log`. Nothing to remember, nothing to forget.
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: changelog-${{ github.event.pull_request.base.ref }}
+  cancel-in-progress: false
+
+jobs:
+  record:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Add the entry
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f CHANGELOG.md ]; then
+            printf '%s\n\n%s\n\n%s\n' \
+              '# Changelog' \
+              'Every merged pull request, newest first. Maintained automatically by `.github/workflows/changelog.yml`.' \
+              '## Unreleased' > CHANGELOG.md
+          fi
+
+          if ! grep -q '^## Unreleased' CHANGELOG.md; then
+            printf '\n## Unreleased\n' >> CHANGELOG.md
+          fi
+
+          # Skip if this pull request is already recorded (re-runs, reopened merges).
+          if grep -qF "](${PR_URL})" CHANGELOG.md; then
+            echo "Pull request #${PR_NUMBER} is already in the changelog."
+            exit 0
+          fi
+
+          ENTRY="- \`$(date -u +%Y-%m-%d)\` ${PR_TITLE//$'\n'/ } ([#${PR_NUMBER}](${PR_URL})) — @${PR_AUTHOR}"
+          export ENTRY
+          python3 - <<'PY'
+          import os, pathlib
+          path = pathlib.Path('CHANGELOG.md')
+          lines = path.read_text().splitlines()
+          head = next(i for i, l in enumerate(lines) if l.startswith('## Unreleased'))
+          at = head + 1
+          while at < len(lines) and not lines[at].strip():
+              at += 1
+          lines[at:at] = [os.environ['ENTRY']]
+          if at == head + 1:
+              lines.insert(head + 1, '')
+          path.write_text('\n'.join(lines).rstrip() + '\n')
+          PY
+
+      - name: Commit it
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- CHANGELOG.md; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "docs: record #${{ github.event.pull_request.number }} in the changelog [skip ci]"
+          git push origin HEAD:"${{ github.event.pull_request.base.ref }}"
